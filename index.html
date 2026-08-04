@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>객관식 답안지</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, "Noto Sans KR", sans-serif; background:#f5f6f8; color:#222; }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 16px 40px; }
+  h1 { margin:0 0 16px; font-size:26px; }
+  .panel { background:white; border:1px solid #ddd; border-radius:12px; padding:16px; margin-bottom:16px; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  input[type=number], input[type=text] { padding:9px 10px; border:1px solid #bbb; border-radius:7px; font-size:15px; }
+  input[type=number] { width:90px; }
+  input[type=text] { width:100%; max-width:800px; }
+  button { border:1px solid #aaa; background:white; border-radius:7px; padding:9px 14px; cursor:pointer; font-size:14px; }
+  button:hover { background:#f0f0f0; }
+  .primary { background:#222; color:white; border-color:#222; }
+  .danger { color:#b00020; }
+  .status { margin-top:12px; font-size:14px; color:#555; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+  .q { border:1px solid #ddd; border-radius:9px; padding:11px; background:#fff; }
+  .q.correct { border-color:#55a05a; background:#f4fbf4; }
+  .q.wrong { border-color:#d45b5b; background:#fff5f5; }
+  .qhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:bold; }
+  .choices { display:grid; gap:6px; }
+  .choice { padding:7px 2px; }
+  .choice.selected { background:#222; color:white; border-color:#222; }
+  .result { font-weight:bold; min-width:24px; text-align:right; }
+  .score { font-size:20px; font-weight:bold; }
+  .wrong-list { line-height:1.8; }
+  .hint { color:#666; font-size:13px; }
+  @media (max-width:600px) { .grid { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>객관식 답안지</h1>
+
+  <div class="panel">
+    <div class="controls">
+      <label>문제 수
+        <input id="count" type="number" min="1" max="500" value="100">
+      </label>
+      <label>보기 개수
+        <input id="choicesCount" type="number" min="2" max="6" value="4">
+      </label>
+      <button class="primary" onclick="createSheet()">답안지 생성</button>
+      <button onclick="clearAnswers()">내 답 초기화</button>
+      <button class="danger" onclick="resetAll()">전체 초기화</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="panel">
+    <div style="margin-bottom:8px"><b>정답 입력</b></div>
+    <div class="hint" id="keyHint"></div>
+    <div class="controls" style="margin-top:9px">
+      <input id="answerKey" type="text" placeholder="정답을 입력하세요">
+      <button class="primary" onclick="grade()">채점</button>
+    </div>
+  </div>
+
+  <div class="panel" id="resultPanel" style="display:none">
+    <div class="score" id="score"></div>
+    <div id="wrongList" class="wrong-list"></div>
+  </div>
+
+  <div id="sheet" class="grid"></div>
+</div>
+
+<script>
+const ALL_LABELS = ["①","②","③","④","⑤","⑥"];
+let count = 100;
+let choicesCount = 4;
+let answers = [];
+
+function labels() {
+  return ALL_LABELS.slice(0, choicesCount);
+}
+
+function save() {
+  localStorage.setItem("mcq_answers", JSON.stringify({
+    count, choicesCount, answers, key: document.getElementById("answerKey").value
+  }));
+}
+
+function load() {
+  try {
+    const data = JSON.parse(localStorage.getItem("mcq_answers"));
+    if (!data) return false;
+    count = Number(data.count) || 100;
+    choicesCount = Math.max(2, Math.min(6, Number(data.choicesCount) || 4));
+    answers = Array.isArray(data.answers) ? data.answers : [];
+    document.getElementById("count").value = count;
+    document.getElementById("choicesCount").value = choicesCount;
+    document.getElementById("answerKey").value = data.key || "";
+    return true;
+  } catch(e) { return false; }
+}
+
+function createSheet() {
+  count = Math.max(1, Math.min(500, Number(document.getElementById("count").value) || 100));
+  choicesCount = Math.max(2, Math.min(6, Number(document.getElementById("choicesCount").value) || 4));
+  document.getElementById("count").value = count;
+  document.getElementById("choicesCount").value = choicesCount;
+  const old = answers;
+  answers = Array.from({length:count}, (_,i) => old[i] || 0);
+  render();
+  save();
+}
+
+function render() {
+  const sheet = document.getElementById("sheet");
+  sheet.innerHTML = "";
+  const labs = labels();
+  for (let i=0; i<count; i++) {
+    const q = document.createElement("div");
+    q.className = "q";
+    q.id = "q"+i;
+    q.innerHTML = `
+      <div class="qhead">
+        <span>${i+1}번</span>
+        <span class="result" id="r${i}"></span>
+      </div>
+      <div class="choices" style="grid-template-columns:repeat(${choicesCount},1fr)">
+        ${labs.map((x,j)=>`<button class="choice ${answers[i]===j+1?'selected':''}" onclick="selectAnswer(${i},${j+1})">${x}</button>`).join("")}
+      </div>`;
+    sheet.appendChild(q);
+  }
+  document.getElementById("status").textContent = `총 ${count}문제 · ${choicesCount}지선다 · 선택한 답은 자동 저장돼.`;
+  document.getElementById("keyHint").textContent =
+    `예: 1 3 2 4 1 ... 또는 ${labs.join("")}처럼 원문자로 붙여넣어도 돼. (허용 범위: 1~${choicesCount})`;
+  document.getElementById("resultPanel").style.display = "none";
+}
+
+function selectAnswer(i, value) {
+  answers[i] = value;
+  const q = document.getElementById("q"+i);
+  q.querySelectorAll(".choice").forEach((b,j)=>b.classList.toggle("selected", j+1===value));
+  save();
+}
+
+function parseKey(raw) {
+  let s = raw.replace(/[\s,，、|/]+/g, "");
+  const labs = labels();
+  s = s.replace(/[①②③④⑤⑥]/g, ch => {
+    const idx = labs.indexOf(ch);
+    return idx >= 0 ? String(idx+1) : "";
+  });
+  const digits = "123456".slice(0, choicesCount);
+  const arr = [];
+  for (const ch of s) {
+    if (digits.includes(ch)) arr.push(Number(ch));
+  }
+  return arr;
+}
+
+function grade() {
+  const key = parseKey(document.getElementById("answerKey").value);
+  if (key.length !== count) {
+    alert(`정답 개수가 ${count}개여야 해. 현재 ${key.length}개야.`);
+    return;
+  }
+
+  let correct = 0;
+  const wrong = [];
+
+  for (let i=0; i<count; i++) {
+    const q = document.getElementById("q"+i);
+    const r = document.getElementById("r"+i);
+    q.classList.remove("correct","wrong");
+    if (answers[i] === key[i]) {
+      correct++;
+      q.classList.add("correct");
+      r.textContent = "O";
+    } else {
+      q.classList.add("wrong");
+      r.textContent = "X";
+      wrong.push(`${i+1}번 (내 답: ${answers[i] || "미선택"}, 정답: ${key[i]})`);
+    }
+  }
+
+  document.getElementById("score").textContent =
+    `${correct} / ${count} (${(correct/count*100).toFixed(1)}점)`;
+
+  document.getElementById("wrongList").innerHTML =
+    wrong.length
+      ? `<b>틀린 문제 ${wrong.length}개</b><br>${wrong.join("<br>")}`
+      : `<b>전부 정답이야 🎉</b>`;
+
+  document.getElementById("resultPanel").style.display = "block";
+  save();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function clearAnswers() {
+  answers = Array(count).fill(0);
+  render();
+  save();
+}
+
+function resetAll() {
+  if (!confirm("답안과 정답을 모두 초기화할까?")) return;
+  localStorage.removeItem("mcq_answers");
+  count = 100;
+  choicesCount = 4;
+  answers = [];
+  document.getElementById("count").value = 100;
+  document.getElementById("choicesCount").value = 4;
+  document.getElementById("answerKey").value = "";
+  createSheet();
+}
+
+if (!load()) {
+  answers = Array(count).fill(0);
+}
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "answer-sheet",
+  "version": "1.0.0",
+  "description": "객관식 답안지 채점 앱",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.mokacat.answersheet",
+    "productName": "AnswerSheet",
+    "files": [
+      "index.html",
+      "electron/**/*"
+    ],
+    "afterSign": "build/afterSign.js",
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.education",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    }
+  }
+}
