@@ -27,6 +27,7 @@
   .choices { display:grid; gap:6px; }
   .choice { padding:7px 2px; }
   .choice.selected { background:#222; color:white; border-color:#222; }
+  .choice.answer-key { border-color:#2f7dd1; box-shadow: inset 0 0 0 2px #2f7dd1; background:#eaf2fc; color:#1a4d8f; font-weight:bold; }
   .result { font-weight:bold; min-width:24px; text-align:right; }
   .score { font-size:20px; font-weight:bold; }
   .wrong-list { line-height:1.8; }
@@ -171,6 +172,7 @@ function grade() {
     const q = document.getElementById("q"+i);
     const r = document.getElementById("r"+i);
     q.classList.remove("correct","wrong");
+    q.querySelectorAll(".choice").forEach(b => b.classList.remove("answer-key"));
     if (answers[i] === key[i]) {
       correct++;
       q.classList.add("correct");
@@ -178,6 +180,7 @@ function grade() {
     } else {
       q.classList.add("wrong");
       r.textContent = "X";
+      q.querySelectorAll(".choice")[key[i]-1].classList.add("answer-key");
       wrong.push(`${i+1}번 (내 답: ${answers[i] || "미선택"}, 정답: ${key[i]})`);
     }
   }
